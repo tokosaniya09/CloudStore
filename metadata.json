@@ -1,0 +1,6 @@
+{
+  "name": "CloudStore Enterprise Platform",
+  "description": "Enterprise-grade cloud storage platform featuring pre-signed S3 chunked uploads, materialized path folder structures, file versioning, organization quota management, audit logging, and microservice system topology visualization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

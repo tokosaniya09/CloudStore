@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered user profile in CloudStore",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 256 },
+        "firstName": { "type": "string", "maxLength": 100 },
+        "lastName": { "type": "string", "maxLength": 100 },
+        "systemRole": { "type": "string", "enum": ["ADMIN", "ORGANIZATION_ADMIN", "USER"] },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "email", "firstName", "lastName", "systemRole"]
+    },
+    "Organization": {
+      "title": "Organization",
+      "description": "Multi-tenant enterprise organization workspace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "storageQuotaBytes": { "type": "number" },
+        "storageUsedBytes": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "ownerId"]
+    },
+    "Folder": {
+      "title": "Folder",
+      "description": "Materialized path directory node",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 255 },
+        "parentId": { "type": "string" },
+        "organizationId": { "type": "string", "maxLength": 128 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "materializedPath": { "type": "string", "maxLength": 1000 },
+        "isDeleted": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "organizationId", "ownerId", "materializedPath"]
+    },
+    "FileItem": {
+      "title": "FileItem",
+      "description": "File metadata record stored in S3/Cloud storage",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 255 },
+        "extension": { "type": "string", "maxLength": 50 },
+        "mimeType": { "type": "string", "maxLength": 100 },
+        "sizeBytes": { "type": "number" },
+        "folderId": { "type": "string" },
+        "organizationId": { "type": "string", "maxLength": 128 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "currentVersionNumber": { "type": "number" },
+        "s3StorageKey": { "type": "string", "maxLength": 500 },
+        "tags": { "type": "array" },
+        "isDeleted": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "organizationId", "ownerId", "s3StorageKey"]
+    },
+    "FileVersion": {
+      "title": "FileVersion",
+      "description": "Immutable version history snapshot of a file",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "fileId": { "type": "string", "maxLength": 128 },
+        "versionNumber": { "type": "number" },
+        "s3StorageKey": { "type": "string", "maxLength": 500 },
+        "sizeBytes": { "type": "number" },
+        "uploadedById": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "fileId", "versionNumber", "s3StorageKey"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System event audit log record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "actorId": { "type": "string", "maxLength": 128 },
+        "actorEmail": { "type": "string", "maxLength": 256 },
+        "action": { "type": "string", "maxLength": 100 },
+        "resourceType": { "type": "string", "maxLength": 50 },
+        "resourceId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "actorId", "action", "resourceType"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Registered CloudStore users"
+    },
+    "/organizations/{orgId}": {
+      "schema": { "$ref": "#/entities/Organization" },
+      "description": "Enterprise organizations"
+    },
+    "/folders/{folderId}": {
+      "schema": { "$ref": "#/entities/Folder" },
+      "description": "Directory folder tree nodes"
+    },
+    "/files/{fileId}": {
+      "schema": { "$ref": "#/entities/FileItem" },
+      "description": "Uploaded file records"
+    },
+    "/files/{fileId}/versions/{versionId}": {
+      "schema": { "$ref": "#/entities/FileVersion" },
+      "description": "File version snapshots"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Audit security event logs"
+    }
+  }
+}
