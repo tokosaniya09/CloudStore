@@ -44,11 +44,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ activeOr
     );
   }
 
-  const usedMb = (data.totalStorageUsedBytes / (1024 * 1024)).toFixed(1);
+  const usedMb = (data.totalStorageUsedBytes / (1024 * 1024)).toFixed(2);
   const quotaGb = (data.totalStorageQuotaBytes / (1024 * 1024 * 1024)).toFixed(1);
   const usagePct = Math.min(
     100,
-    Math.round((data.totalStorageUsedBytes / data.totalStorageQuotaBytes) * 100)
+    parseFloat(((data.totalStorageUsedBytes / data.totalStorageQuotaBytes) * 100).toFixed(1))
   );
 
   return (

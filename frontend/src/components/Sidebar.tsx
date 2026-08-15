@@ -50,19 +50,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const usedBytes = activeOrg?.storageUsedBytes || 0;
   const quotaBytes = activeOrg?.storageQuotaBytes || 10737418240;
-  const usagePercentage = Math.min(100, Math.round((usedBytes / quotaBytes) * 100));
+  const usagePercentage = Math.min(100, parseFloat(((usedBytes / quotaBytes) * 100).toFixed(1)));
+
+  const formatStorage = (bytes: number): string => {
+    if (bytes === 0) return '0.00 MB';
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1024) {
+      return `${(mb / 1024).toFixed(2)} GB`;
+    }
+    return `${mb.toFixed(2)} MB`;
+  };
+
+  const formatQuota = (bytes: number): string => {
+    const gb = bytes / (1024 * 1024 * 1024);
+    if (gb >= 1) {
+      return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
 
   const isAdminOrOrgAdmin = activeUser?.systemRole === 'ADMIN' || activeUser?.systemRole === 'ORGANIZATION_ADMIN';
 
   return (
-    <aside className="w-64 bg-[#f8f9fa] border-r border-gray-200/80 text-gray-700 p-4 flex flex-col justify-between shrink-0 min-h-[calc(100vh-57px)] font-sans">
-      <div className="space-y-6">
-        
+    <aside className="w-64 bg-[#f8f9fa] border-r border-gray-200/80 text-gray-700 p-4 flex flex-col justify-between shrink-0 h-full overflow-hidden font-sans select-none">
+      <div className="flex flex-col space-y-5 min-h-0">
         {/* Modern CloudStore "+ New" Button */}
         <div className="relative">
           <button
             onClick={() => setShowNewMenu(!showNewMenu)}
-            className="flex items-center gap-2.5 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/15 hover:shadow-lg transition-all cursor-pointer group"
+            className="flex items-center gap-2.5 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/15 hover:shadow-lg transition-all cursor-pointer group"
           >
             <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
               <Plus className="w-4 h-4 text-white stroke-[2.5] group-hover:scale-110 transition-transform" />
@@ -108,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`w-full flex items-center gap-3.5 px-4 py-2.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3.5 px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer ${
                   isActive
                     ? 'bg-[#c2e7ff] text-[#001d35] font-bold shadow-xs'
                     : 'text-gray-700 hover:bg-[#e9eef6]'
@@ -123,8 +139,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Admin Console & Analytics Section */}
         {isAdminOrOrgAdmin && (
-          <div className="space-y-1 pt-3 border-t border-gray-200/80">
-            <div className="px-4 py-1.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+          <div className="space-y-1 pt-2 border-t border-gray-200/80">
+            <div className="px-4 py-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
               Admin & Governance
             </div>
             {adminItems.map((item) => {
@@ -134,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-2.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
+                  className={`w-full flex items-center gap-3.5 px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer ${
                     isActive
                       ? 'bg-[#c2e7ff] text-[#001d35] font-bold shadow-xs'
                       : 'text-gray-700 hover:bg-[#e9eef6]'
@@ -150,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Storage Gauge Anchored at Bottom */}
-      <div className="pt-4 border-t border-gray-200 space-y-2">
+      <div className="pt-3 border-t border-gray-200/80 space-y-2 shrink-0 mt-auto">
         <div className="flex items-center justify-between text-xs text-gray-700 font-semibold">
           <span className="flex items-center gap-1.5">
             <Cloud className="w-4 h-4 text-blue-600" />
@@ -173,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <p className="text-[11px] text-gray-500 font-medium">
-          {(usedBytes / (1024 * 1024)).toFixed(0)} MB of {(quotaBytes / (1024 * 1024 * 1024)).toFixed(0)} GB used
+          {formatStorage(usedBytes)} of {formatQuota(quotaBytes)} used
         </p>
 
         <button

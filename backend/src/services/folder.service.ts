@@ -176,6 +176,77 @@ export class FolderService {
   public getFoldersInOrg(orgId: string): Folder[] {
     return Array.from(db.folders.values()).filter((f) => f.organizationId === orgId && !f.isDeleted);
   }
+
+  public getTrashFolders(orgId: string): Folder[] {
+    return Array.from(db.folders.values()).filter((f) => f.organizationId === orgId && f.isDeleted);
+  }
+
+  public restoreFolderRecursive(folderId: string, orgId: string, actorUserId: string): { restoredFolders: number; restoredFiles: number } {
+    const targetFolder = db.folders.get(folderId);
+    if (!targetFolder || targetFolder.organizationId !== orgId || !targetFolder.isDeleted) {
+      throw new Error('Folder not found or not in trash');
+    }
+
+    const targetPrefix = targetFolder.materializedPath;
+    const now = new Date().toISOString();
+    let restoredFolders = 0;
+    let restoredFiles = 0;
+
+    for (const folder of db.folders.values()) {
+      if (folder.materializedPath.startsWith(targetPrefix) && folder.organizationId === orgId && folder.isDeleted) {
+        folder.isDeleted = false;
+        folder.deletedAt = null;
+        folder.updatedAt = now;
+        db.saveFolder(folder);
+        restoredFolders++;
+      }
+    }
+
+    for (const file of db.files.values()) {
+      if (file.organizationId === orgId && file.isDeleted && file.folderId) {
+        const fileFolder = db.folders.get(file.folderId);
+        if (fileFolder && fileFolder.materializedPath.startsWith(targetPrefix)) {
+          file.isDeleted = false;
+          file.deletedAt = null;
+          file.updatedAt = now;
+          db.saveFile(file);
+          restoredFiles++;
+        }
+      }
+    }
+
+    kafkaService.publish('file-events-topic', folderId, {
+      eventType: 'FolderRestored',
+      fileId: folderId,
+      userId: actorUserId,
+      details: { folderName: targetFolder.name, restoredFolders, restoredFiles },
+    });
+
+    return { restoredFolders, restoredFiles };
+  }
+
+  public permanentDeleteFolder(folderId: string, orgId: string, actorUserId: string): void {
+    const targetFolder = db.folders.get(folderId);
+    if (!targetFolder || targetFolder.organizationId !== orgId) {
+      throw new Error('Folder not found');
+    }
+    const targetPrefix = targetFolder.materializedPath;
+
+    for (const file of Array.from(db.files.values())) {
+      if (file.organizationId === orgId && file.folderId) {
+        const fileFolder = db.folders.get(file.folderId);
+        if (fileFolder && fileFolder.materializedPath.startsWith(targetPrefix)) {
+          db.removeFile(file.id);
+        }
+      }
+    }
+
+    for (const folder of Array.from(db.folders.values())) {
+      if (folder.materializedPath.startsWith(targetPrefix) && folder.organizationId === orgId) {
+        db.removeFolder(folder.id);
+      }
+    }
+  }
 }
 
 export const folderService = new FolderService();

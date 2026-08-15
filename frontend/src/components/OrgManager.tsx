@@ -94,7 +94,7 @@ export const OrgManager: React.FC<OrgManagerProps> = ({ activeOrgId, orgs, onRef
             <div className="flex justify-between">
               <span className="text-gray-500">Current Usage:</span>
               <span className="text-gray-900">
-                {((activeOrg?.storageUsedBytes || 0) / (1024 * 1024)).toFixed(1)} MB
+                {((activeOrg?.storageUsedBytes || 0) / (1024 * 1024)).toFixed(2)} MB
               </span>
             </div>
             <div className="flex justify-between">

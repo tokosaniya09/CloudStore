@@ -136,7 +136,7 @@ export default function App() {
   const isDriveView = ['drive', 'shared', 'recent', 'starred', 'trash', 'explorer'].includes(activeTab);
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-gray-800 font-sans flex flex-col antialiased">
+    <div className="h-screen bg-[#f8f9fa] text-gray-800 font-sans flex flex-col antialiased overflow-hidden">
       {/* Top Navbar */}
       <Navbar
         users={users}
@@ -151,7 +151,7 @@ export default function App() {
         onSearchChange={setSearchQuery}
       />
 
-      <div className="flex flex-1 w-full max-w-[1800px] mx-auto">
+      <div className="flex flex-1 w-full max-w-[1800px] mx-auto overflow-hidden">
         {/* Left Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -163,11 +163,11 @@ export default function App() {
         />
 
         {/* Main Workspace Canvas */}
-        <main className="flex-1 p-4 md:p-6 min-w-0 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 min-w-0 overflow-y-auto h-full">
           {isDriveView && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="flex flex-col gap-6 w-full">
               {/* Directory Navigation Tree */}
-              <div className="lg:col-span-1">
+              <div className="w-full">
                 <FolderTree
                   folders={folders}
                   activeFolderId={activeFolderId}
@@ -180,7 +180,7 @@ export default function App() {
               </div>
 
               {/* File Explorer */}
-              <div className="lg:col-span-3">
+              <div className="w-full">
                 <FileExplorer
                   files={files}
                   folders={folders}
@@ -192,6 +192,8 @@ export default function App() {
                   onOpenSharing={(file) => setSharingModalFile(file)}
                   onNewFolderClick={() => setShowFolderModal(true)}
                   searchQuery={searchQuery}
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
                 />
               </div>
             </div>

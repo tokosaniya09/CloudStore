@@ -76,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const unreadCount = notifications.filter((n) => !n.read).length;
   const usedBytes = activeOrg?.storageUsedBytes || 0;
   const quotaBytes = activeOrg?.storageQuotaBytes || 10737418240;
-  const usagePercentage = Math.min(100, Math.round((usedBytes / quotaBytes) * 100));
+  const usagePercentage = Math.min(100, parseFloat(((usedBytes / quotaBytes) * 100).toFixed(1)));
 
   const roleLabel = activeUser?.systemRole === 'ORGANIZATION_ADMIN'
     ? 'Org Admin'
@@ -163,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               />
             </div>
             <span className="text-gray-700 font-semibold text-[11px]">
-              {(usedBytes / (1024 * 1024)).toFixed(0)} MB
+              {(usedBytes / (1024 * 1024)).toFixed(2)} MB
             </span>
           </div>
 

@@ -115,10 +115,12 @@ class DatabaseStore {
       // 5. Fetch File Versions
       const versionsSnap = await getDocs(collection(firestoreDb, 'fileVersions'));
       if (!versionsSnap.empty) {
-        this.fileVersions = [];
+        const vMap = new Map<string, FileVersion>();
         versionsSnap.forEach((d) => {
-          this.fileVersions.push(d.data() as FileVersion);
+          const v = d.data() as FileVersion;
+          vMap.set(v.id, v);
         });
+        this.fileVersions = Array.from(vMap.values());
       }
 
       // 6. Fetch Audit Logs
@@ -261,7 +263,12 @@ class DatabaseStore {
   }
 
   public async saveFileVersion(version: FileVersion) {
-    this.fileVersions.push(version);
+    const idx = this.fileVersions.findIndex((v) => v.id === version.id);
+    if (idx >= 0) {
+      this.fileVersions[idx] = version;
+    } else {
+      this.fileVersions.push(version);
+    }
     try {
       await setDoc(doc(firestoreDb, 'fileVersions', version.id), version);
     } catch (err) {

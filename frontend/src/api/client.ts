@@ -124,6 +124,19 @@ export class ApiClient {
     });
   }
 
+  public restoreFolder(folderId: string, orgId: string): Promise<{ message: string; restoredFolders: number; restoredFiles: number }> {
+    return this.request<{ message: string; restoredFolders: number; restoredFiles: number }>(`/folders/${folderId}/restore`, {
+      method: 'POST',
+      body: JSON.stringify({ orgId }),
+    });
+  }
+
+  public permanentDeleteFolder(folderId: string, orgId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/folders/${folderId}/permanent?orgId=${orgId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Files
   public searchFiles(orgId: string, query: string): Promise<FileItem[]> {
     return this.request<FileItem[]>(`/files/search?orgId=${orgId}&query=${encodeURIComponent(query)}`);
@@ -147,6 +160,30 @@ export class ApiClient {
   public deleteFile(fileId: string): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/files/${fileId}`, {
       method: 'DELETE',
+    });
+  }
+
+  public restoreFile(fileId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/files/${fileId}/restore`, {
+      method: 'POST',
+    });
+  }
+
+  public permanentDeleteFile(fileId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/files/${fileId}/permanent`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Trash & Retention
+  public getTrash(orgId: string): Promise<{ files: FileItem[]; folders: Folder[] }> {
+    return this.request<{ files: FileItem[]; folders: Folder[] }>(`/trash?orgId=${orgId}`);
+  }
+
+  public emptyTrash(orgId: string): Promise<{ message: string; deletedFiles: number; deletedFolders: number }> {
+    return this.request<{ message: string; deletedFiles: number; deletedFolders: number }>('/trash/empty', {
+      method: 'POST',
+      body: JSON.stringify({ orgId }),
     });
   }
 

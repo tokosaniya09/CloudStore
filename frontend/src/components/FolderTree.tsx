@@ -45,6 +45,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   const [showMoveModal, setShowMoveModal] = useState<Folder | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [targetParentId, setTargetParentId] = useState<string | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -183,19 +184,22 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     }
   };
 
-  const handleDeleteFolder = async (folder: Folder) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete folder "${folder.name}" and all contents inside it?`
-      )
-    )
-      return;
+  const handleDeleteFolder = (folder: Folder) => {
+    setFolderToDelete(folder);
+  };
+
+  const handleConfirmDeleteFolder = async () => {
+    if (!folderToDelete) return;
     try {
-      await apiClient.deleteFolder(folder.id, activeOrgId);
-      if (activeFolderId === folder.id) onSelectFolder(null);
+      setIsSubmitting(true);
+      await apiClient.deleteFolder(folderToDelete.id, activeOrgId);
+      if (activeFolderId === folderToDelete.id) onSelectFolder(null);
+      setFolderToDelete(null);
       onFolderChange();
     } catch (err: any) {
       alert(err.message || 'Failed to delete folder');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -649,6 +653,58 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Delete Folder */}
+      {folderToDelete && (
+        <div className="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-gray-200 p-6 max-w-sm w-full space-y-4 shadow-2xl text-gray-800 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                <span>Delete Folder</span>
+              </h3>
+              <button
+                onClick={() => setFolderToDelete(null)}
+                disabled={isSubmitting}
+                className="text-gray-400 hover:text-gray-700 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs text-gray-600">
+              <p>Are you sure you want to delete this folder?</p>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2">
+                <FolderIcon className="w-5 h-5 text-amber-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900 truncate">{folderToDelete.name}</p>
+                  <p className="text-[11px] text-amber-800">All nested subfolders and files inside will be permanently deleted.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setFolderToDelete(null)}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-full text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteFolder}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isSubmitting ? 'Deleting...' : 'Delete Folder'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

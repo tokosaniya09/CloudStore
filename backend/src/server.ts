@@ -317,11 +317,67 @@ async function startServer() {
     }
   });
 
+  app.delete('/api/v1/files/:id/permanent', (req, res) => {
+    try {
+      const actorUserId = getActorUserId(req);
+      fileService.permanentDeleteFile(req.params.id, actorUserId);
+      res.json({ message: 'File permanently deleted' });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.post('/api/v1/files/:id/restore', (req, res) => {
     try {
       const actorUserId = getActorUserId(req);
       fileService.restoreFile(req.params.id, actorUserId);
       res.json({ message: 'File restored from trash' });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Folder Restore & Permanent Delete
+  app.post('/api/v1/folders/:id/restore', (req, res) => {
+    try {
+      const actorUserId = getActorUserId(req);
+      const orgId = (req.query.orgId as string) || (req.body.orgId as string) || 'org-101';
+      const result = folderService.restoreFolderRecursive(req.params.id, orgId, actorUserId);
+      res.json({ message: 'Folder restored from trash', ...result });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/v1/folders/:id/permanent', (req, res) => {
+    try {
+      const actorUserId = getActorUserId(req);
+      const orgId = (req.query.orgId as string) || 'org-101';
+      folderService.permanentDeleteFolder(req.params.id, orgId, actorUserId);
+      res.json({ message: 'Folder permanently deleted' });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Trash collection & Empty Trash
+  app.get('/api/v1/trash', (req, res) => {
+    try {
+      const orgId = (req.query.orgId as string) || 'org-101';
+      const files = fileService.getTrashFiles(orgId);
+      const folders = folderService.getTrashFolders(orgId);
+      res.json({ files, folders });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/v1/trash/empty', (req, res) => {
+    try {
+      const actorUserId = getActorUserId(req);
+      const orgId = (req.query.orgId as string) || (req.body.orgId as string) || 'org-101';
+      const result = fileService.emptyTrash(orgId, actorUserId);
+      res.json({ message: 'Trash emptied successfully', ...result });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
