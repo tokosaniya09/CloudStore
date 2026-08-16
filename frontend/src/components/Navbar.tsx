@@ -3,7 +3,6 @@ import {
   Search,
   Bell,
   Building2,
-  HardDrive,
   UserCheck,
   Shield,
   LogOut,
@@ -74,9 +73,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const usedBytes = activeOrg?.storageUsedBytes || 0;
-  const quotaBytes = activeOrg?.storageQuotaBytes || 10737418240;
-  const usagePercentage = Math.min(100, parseFloat(((usedBytes / quotaBytes) * 100).toFixed(1)));
 
   const roleLabel = activeUser?.systemRole === 'ORGANIZATION_ADMIN'
     ? 'Org Admin'
@@ -145,26 +141,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Storage Quota Gauge */}
-          <div className="hidden sm:flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-full px-3 py-1.5 text-xs text-gray-700">
-            <HardDrive className="w-3.5 h-3.5 text-gray-500" />
-            <div className="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  usagePercentage > 90
-                    ? 'bg-red-500'
-                    : usagePercentage > 75
-                    ? 'bg-amber-500'
-                    : 'bg-blue-600'
-                }`}
-                style={{ width: `${usagePercentage}%` }}
-              />
-            </div>
-            <span className="text-gray-700 font-semibold text-[11px]">
-              {(usedBytes / (1024 * 1024)).toFixed(2)} MB
-            </span>
           </div>
 
           {/* Activity Notifications */}

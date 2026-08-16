@@ -6,6 +6,7 @@ import { FileExplorer } from './components/FileExplorer.tsx';
 import { ChunkedUploader } from './components/ChunkedUploader.tsx';
 import { VersionHistoryModal } from './components/VersionHistoryModal.tsx';
 import { SharingModal } from './components/SharingModal.tsx';
+import { FilePreviewModal } from './components/FilePreviewModal.tsx';
 import { OrgManager } from './components/OrgManager.tsx';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard.tsx';
 import { AuditLogViewer } from './components/AuditLogViewer.tsx';
@@ -33,6 +34,7 @@ export default function App() {
   // Modals
   const [versionModalFile, setVersionModalFile] = useState<FileItem | null>(null);
   const [sharingModalFile, setSharingModalFile] = useState<FileItem | null>(null);
+  const [previewModalFile, setPreviewModalFile] = useState<FileItem | null>(null);
 
   useEffect(() => {
     initApp();
@@ -190,6 +192,7 @@ export default function App() {
                   onRefresh={fetchOrgData}
                   onOpenVersions={(file) => setVersionModalFile(file)}
                   onOpenSharing={(file) => setSharingModalFile(file)}
+                  onOpenFile={(file) => setPreviewModalFile(file)}
                   onNewFolderClick={() => setShowFolderModal(true)}
                   searchQuery={searchQuery}
                   activeTab={activeTab}
@@ -239,6 +242,10 @@ export default function App() {
       <VersionHistoryModal
         file={versionModalFile}
         onClose={() => setVersionModalFile(null)}
+        onPreviewVersion={(versionedFile) => {
+          setPreviewModalFile(versionedFile);
+          setVersionModalFile(null);
+        }}
         onVersionRolledBack={fetchOrgData}
       />
 
@@ -246,6 +253,12 @@ export default function App() {
       <SharingModal
         file={sharingModalFile}
         onClose={() => setSharingModalFile(null)}
+      />
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        file={previewModalFile}
+        onClose={() => setPreviewModalFile(null)}
       />
     </div>
   );

@@ -7,15 +7,19 @@ export class FileService {
   /**
    * Complete direct S3 upload & create file / new version record in atomic transaction
    */
-  public completeFileUpload(userId: string, req: FileUploadCompleteRequest): FileItem {
+  public async completeFileUpload(userId: string, req: FileUploadCompleteRequest): Promise<FileItem> {
     const org = db.organizations.get(req.orgId);
     if (!org) {
       throw new Error('Organization not found');
     }
 
-    // Assemble any uploaded chunks into final file buffer
+    // Complete Multipart Assembly in S3 or local storage
     if (req.uploadId) {
-      localStorageManager.assembleChunks(req.uploadId, req.s3Key);
+      if (req.parts && req.parts.length > 0) {
+        await s3StorageService.completeMultipartUpload(req.s3Key, req.uploadId, req.parts);
+      } else {
+        localStorageManager.assembleChunks(req.uploadId, req.s3Key);
+      }
     }
 
     // Check storage quota constraint
@@ -153,7 +157,7 @@ export class FileService {
   /**
    * Generate S3 Pre-Signed Download URL
    */
-  public createDownloadUrl(fileId: string, userId: string): string {
+  public async createDownloadUrl(fileId: string, userId: string, isDownload: boolean = false): Promise<string> {
     const file = db.files.get(fileId);
     if (!file || file.isDeleted) {
       throw new Error('File not found');
@@ -166,7 +170,7 @@ export class FileService {
       details: { fileName: file.name, version: file.currentVersionNumber },
     });
 
-    return s3StorageService.generatePreSignedDownloadUrl(file.s3StorageKey, file.name, 15);
+    return await s3StorageService.generatePreSignedDownloadUrl(file.s3StorageKey, file.name, isDownload, 60);
   }
 
   /**
@@ -176,7 +180,6 @@ export class FileService {
     const versionMap = new Map<string, FileVersion>();
     for (const v of db.fileVersions) {
       if (v.fileId === fileId) {
-        // Key by version id and also ensure one entry per version number
         const key = `${v.fileId}-v${v.versionNumber}`;
         if (!versionMap.has(key)) {
           versionMap.set(key, v);
@@ -233,9 +236,14 @@ export class FileService {
     });
   }
 
-  public permanentDeleteFile(fileId: string, userId: string): void {
+  public async permanentDeleteFile(fileId: string, userId: string): Promise<void> {
     const file = db.files.get(fileId);
     if (!file) throw new Error('File not found');
+
+    // Delete in S3 Object Storage
+    if (file.s3StorageKey) {
+      await s3StorageService.deleteObject(file.s3StorageKey);
+    }
 
     db.removeFile(file.id);
     kafkaService.publish('file-events-topic', file.id, {
@@ -246,69 +254,50 @@ export class FileService {
     });
   }
 
+  public async emptyTrash(orgId: string, userId: string): Promise<{ deletedFilesCount: number; deletedFoldersCount: number }> {
+    const trashFiles = this.getTrashFiles(orgId);
+    let deletedFilesCount = 0;
+
+    for (const file of trashFiles) {
+      await this.permanentDeleteFile(file.id, userId);
+      deletedFilesCount++;
+    }
+
+    // Also remove any deleted folders for this org
+    let deletedFoldersCount = 0;
+    const deletedFolders = Array.from(db.folders.values()).filter((f) => f.organizationId === orgId && f.isDeleted);
+    for (const folder of deletedFolders) {
+      db.removeFolder(folder.id);
+      deletedFoldersCount++;
+    }
+
+    return { deletedFilesCount, deletedFoldersCount };
+  }
+
   public getTrashFiles(orgId: string): FileItem[] {
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
     const now = Date.now();
-    const trashFiles = Array.from(db.files.values()).filter((f) => f.organizationId === orgId && f.isDeleted);
 
-    // Auto-clean files older than 7 days retention limit
-    for (const file of trashFiles) {
-      if (file.deletedAt) {
-        const deletedTime = new Date(file.deletedAt).getTime();
-        if (now - deletedTime > SEVEN_DAYS_MS) {
-          db.removeFile(file.id);
-        }
-      }
-    }
-
-    return Array.from(db.files.values()).filter((f) => f.organizationId === orgId && f.isDeleted);
-  }
-
-  public emptyTrash(orgId: string, userId: string): { deletedFiles: number; deletedFolders: number } {
-    let deletedFiles = 0;
-    let deletedFolders = 0;
-
-    for (const file of Array.from(db.files.values())) {
-      if (file.organizationId === orgId && file.isDeleted) {
-        db.removeFile(file.id);
-        deletedFiles++;
-      }
-    }
-
-    for (const folder of Array.from(db.folders.values())) {
-      if (folder.organizationId === orgId && folder.isDeleted) {
-        db.removeFolder(folder.id);
-        deletedFolders++;
-      }
-    }
-
-    kafkaService.publish('file-events-topic', `trash-${orgId}`, {
-      eventType: 'TrashEmptied',
-      fileId: `trash-${orgId}`,
-      userId,
-      details: { deletedFiles, deletedFolders },
+    return Array.from(db.files.values()).filter((f) => {
+      if (f.organizationId !== orgId || !f.isDeleted) return false;
+      if (!f.deletedAt) return true;
+      const deletedTime = new Date(f.deletedAt).getTime();
+      return now - deletedTime < SEVEN_DAYS_MS;
     });
-
-    return { deletedFiles, deletedFolders };
   }
 
-  /**
-   * Search files by query (filename, tags, extension)
-   */
   public searchFiles(orgId: string, query: string): FileItem[] {
-    const q = query.toLowerCase().trim();
-    if (!q) {
+    if (!query) {
       return Array.from(db.files.values()).filter((f) => f.organizationId === orgId && !f.isDeleted);
     }
-
-    return Array.from(db.files.values()).filter(
-      (f) =>
-        f.organizationId === orgId &&
-        !f.isDeleted &&
-        (f.name.toLowerCase().includes(q) ||
-          f.extension.toLowerCase().includes(q) ||
-          f.tags.some((t) => t.toLowerCase().includes(q)))
-    );
+    const q = query.toLowerCase();
+    return Array.from(db.files.values()).filter((f) => {
+      if (f.organizationId !== orgId || f.isDeleted) return false;
+      const matchesName = f.name.toLowerCase().includes(q);
+      const matchesTag = f.tags && f.tags.some((t) => t.toLowerCase().includes(q));
+      const matchesExt = f.extension && f.extension.toLowerCase().includes(q);
+      return matchesName || matchesTag || matchesExt;
+    });
   }
 }
 

@@ -41,6 +41,7 @@ interface FileExplorerProps {
   onRefresh: () => void;
   onOpenVersions: (file: FileItem) => void;
   onOpenSharing: (file: FileItem) => void;
+  onOpenFile: (file: FileItem) => void;
   onNewFolderClick?: () => void;
   searchQuery: string;
   activeTab?: string;
@@ -56,6 +57,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   onRefresh,
   onOpenVersions,
   onOpenSharing,
+  onOpenFile,
   onNewFolderClick,
   searchQuery,
   activeTab = 'drive',
@@ -201,17 +203,46 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
             orgId: activeOrgId,
           }),
         });
+        if (!initRes.ok) {
+          const errData = await initRes.json().catch(() => ({}));
+          throw new Error(errData.error || `Upload initialization failed (${initRes.status})`);
+        }
         const initData = await initRes.json();
         const key = initData.s3Key || initData.key;
+        const uploadUrl = initData.presignedPutUrl || `/api/v1/files/upload-binary?key=${encodeURIComponent(key)}`;
 
-        // 2. Upload binary
-        await fetch(`/api/v1/files/upload-binary?key=${encodeURIComponent(key)}`, {
-          method: 'POST',
-          body: arrayBuffer,
-        });
+        // 2. Upload binary directly to S3 Presigned URL or local endpoint
+        const isS3Direct = uploadUrl.startsWith('http://') || uploadUrl.startsWith('https://');
+        try {
+          const uploadRes = await fetch(uploadUrl, {
+            method: isS3Direct ? 'PUT' : 'POST',
+            headers: {
+              'Content-Type': fileToUpload.type || 'application/octet-stream',
+            },
+            body: arrayBuffer,
+          });
+
+          if (!uploadRes.ok) {
+            const errText = await uploadRes.text().catch(() => '');
+            throw new Error(
+              `S3 Upload failed with status ${uploadRes.status}. ${
+                uploadRes.status === 403
+                  ? 'Check IAM S3 permissions (s3:PutObject).'
+                  : errText.slice(0, 100)
+              }`
+            );
+          }
+        } catch (fetchErr: any) {
+          if (isS3Direct && (fetchErr.name === 'TypeError' || fetchErr.message?.includes('Failed to fetch'))) {
+            throw new Error(
+              'Failed to connect to S3. This is usually caused by missing S3 CORS settings. Please enable CORS on your S3 bucket.'
+            );
+          }
+          throw fetchErr;
+        }
 
         // 3. Complete
-        await fetch('/api/v1/files/upload-complete', {
+        const completeRes = await fetch('/api/v1/files/upload-complete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -225,6 +256,11 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
             orgId: activeOrgId,
           }),
         });
+
+        if (!completeRes.ok) {
+          const completeErr = await completeRes.json().catch(() => ({}));
+          throw new Error(completeErr.error || `Failed to finalize file upload (${completeRes.status})`);
+        }
 
         setIsUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1091,7 +1127,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
           {filteredFiles.map((file) => (
             <div
               key={file.id}
-              className="bg-white border border-gray-200/80 hover:border-blue-300 rounded-2xl p-4 flex flex-col justify-between gap-4 transition-all hover:shadow-md group"
+              onClick={() => onOpenFile(file)}
+              className="bg-white border border-gray-200/80 hover:border-blue-300 rounded-2xl p-4 flex flex-col justify-between gap-4 transition-all hover:shadow-md group cursor-pointer"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
@@ -1180,7 +1217,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
             <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
               {filteredFiles.map((file) => (
                 <tr key={file.id} className="hover:bg-blue-50/40 transition-colors group">
-                  <td className="py-3 px-4 flex items-center gap-3">
+                  <td className="py-3 px-4 flex items-center gap-3 cursor-pointer" onClick={() => onOpenFile(file)}>
                     <div className="p-1.5 bg-gray-50 border border-gray-100 rounded-lg shrink-0">
                       {getFileIcon(file.extension)}
                     </div>

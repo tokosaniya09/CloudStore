@@ -134,20 +134,21 @@ export const ChunkedUploader: React.FC<ChunkedUploaderProps> = ({
       if (!urlRes.ok) throw new Error(`Failed getting upload URL for part ${partNumber}`);
       const { url } = await urlRes.json();
 
-      // Post Chunk directly to backend storage endpoint
+      // Post Chunk directly to S3 Presigned URL or backend storage endpoint
       abortControllerRef.current = new AbortController();
+      const isS3Direct = url.startsWith('http://') || url.startsWith('https://');
       const putRes = await fetch(url, {
-        method: 'POST',
+        method: isS3Direct ? 'PUT' : 'POST',
         body: chunkBlob,
         signal: abortControllerRef.current.signal,
       });
 
       if (!putRes.ok) throw new Error(`Failed uploading part ${partNumber}`);
 
-      const etag = putRes.headers.get('ETag') || `etag-part-${partNumber}-${Date.now()}`;
+      const rawEtag = putRes.headers.get('ETag') || `etag-part-${partNumber}-${Date.now()}`;
       completedPartsRef.current.push({
         PartNumber: partNumber,
-        ETag: etag.replace(/"/g, ''),
+        ETag: rawEtag.replace(/"/g, ''),
       });
 
       uploadedBytesRef.current += chunkBlob.size;

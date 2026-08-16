@@ -137,6 +137,7 @@ export interface FileUploadCompleteRequest {
   sizeBytes: number;
   folderId: string | null;
   orgId: string;
+  parts?: { PartNumber: number; ETag: string }[];
 }
 
 export interface ChunkPresignRequest {

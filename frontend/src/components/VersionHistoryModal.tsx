@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { History, RotateCcw, X, Check, Clock, Database, AlertCircle } from 'lucide-react';
+import { History, RotateCcw, X, Check, Clock, Database, AlertCircle, Eye, Download } from 'lucide-react';
 import { FileItem, FileVersion } from '../types/index.ts';
 import { apiClient } from '../api/client.ts';
 
 interface VersionHistoryModalProps {
   file: FileItem | null;
   onClose: () => void;
+  onPreviewVersion?: (file: FileItem) => void;
   onVersionRolledBack: () => void;
 }
 
 export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
   file,
   onClose,
+  onPreviewVersion,
   onVersionRolledBack,
 }) => {
   const [versions, setVersions] = useState<FileVersion[]>([]);
@@ -19,6 +21,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [rollingBackVersion, setRollingBackVersion] = useState<number | null>(null);
   const [rollbackConfirm, setRollbackConfirm] = useState<number | null>(null);
+  const [downloadingVersion, setDownloadingVersion] = useState<number | null>(null);
 
   useEffect(() => {
     if (file) {
@@ -63,27 +66,60 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
     }
   };
 
+  const handleDownloadVersion = async (versionNumber: number) => {
+    if (!file) return;
+    try {
+      setDownloadingVersion(versionNumber);
+      const res = await fetch(`/api/v1/files/${file.id}/download?version=${versionNumber}&download=true`);
+      if (!res.ok) throw new Error('Failed to generate download link');
+      const data = await res.json();
+      if (data.downloadUrl) {
+        const link = document.createElement('a');
+        link.href = data.downloadUrl;
+        link.download = `${file.name.replace(/\.[^/.]+$/, '')}_v${versionNumber}.${file.extension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err: any) {
+      alert(`Download failed: ${err.message}`);
+    } finally {
+      setDownloadingVersion(null);
+    }
+  };
+
+  const handlePreview = (ver: FileVersion) => {
+    if (!file || !onPreviewVersion) return;
+    const versionedFile: FileItem = {
+      ...file,
+      currentVersionNumber: ver.versionNumber,
+      s3StorageKey: ver.s3StorageKey,
+      sizeBytes: ver.sizeBytes,
+    };
+    onPreviewVersion(versionedFile);
+  };
+
   if (!file) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-      <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-xl shadow-2xl space-y-4 text-gray-800 animate-fadeIn">
+    <div className="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl border border-gray-200 p-6 max-w-xl w-full space-y-4 shadow-2xl text-gray-800 animate-fadeIn">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-600 rounded-2xl">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
               <History className="w-5 h-5" />
             </div>
-            <div className="min-w-0">
-              <h3 className="text-base font-bold text-gray-900 tracking-tight">Version Lineage & History</h3>
-              <p className="text-xs text-gray-500 font-medium truncate max-w-xs sm:max-w-md">{file.name}</p>
+            <div>
+              <h3 className="font-bold text-gray-900 text-sm">Version History</h3>
+              <p className="text-xs text-gray-500 truncate max-w-xs">{file.name}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+            className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -103,21 +139,22 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
             No previous versions available for this file.
           </div>
         ) : (
-          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+          <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
             {versions.map((ver) => {
               const isCurrent = ver.versionNumber === file.currentVersionNumber;
               return (
                 <div
                   key={ver.id}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  onClick={() => handlePreview(ver)}
+                  className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group hover:shadow-md ${
                     isCurrent
-                      ? 'bg-blue-50/50 border-blue-200 text-gray-900 shadow-2xs'
-                      : 'bg-gray-50/50 border-gray-200/80 text-gray-700 hover:border-gray-300'
+                      ? 'bg-blue-50/60 border-blue-300 text-gray-900 shadow-2xs'
+                      : 'bg-gray-50/70 border-gray-200 text-gray-700 hover:bg-blue-50/20 hover:border-blue-200'
                   }`}
                 >
-                  <div className="space-y-1.5 min-w-0">
+                  <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-xs px-2.5 py-0.5 rounded-full bg-white border border-gray-200 text-gray-800 shadow-2xs">
+                      <span className="font-bold text-xs px-2.5 py-0.5 rounded-full bg-white border border-gray-200 text-gray-800 shadow-2xs group-hover:border-blue-300">
                         Version {ver.versionNumber}
                       </span>
                       {isCurrent && (
@@ -136,41 +173,72 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                       <span>{(ver.sizeBytes / (1024 * 1024)).toFixed(2)} MB</span>
                     </div>
 
-                    <div className="flex items-center gap-1 text-[11px] text-gray-400 truncate max-w-sm">
+                    <div className="flex items-center gap-1 text-[11px] text-gray-400 truncate max-w-sm font-mono">
                       <Database className="w-3 h-3 shrink-0" />
                       <span className="truncate">{ver.s3StorageKey}</span>
                     </div>
                   </div>
 
-                  {!isCurrent && (
-                    <div className="flex items-center gap-2 shrink-0">
-                      {rollbackConfirm === ver.versionNumber ? (
-                        <div className="flex items-center gap-1.5">
+                  {/* Actions Bar */}
+                  <div
+                    className="flex items-center gap-1.5 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Preview Eye Icon Button */}
+                    <button
+                      type="button"
+                      onClick={() => handlePreview(ver)}
+                      className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-all cursor-pointer shadow-xs"
+                      title={`Preview version ${ver.versionNumber}`}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+
+                    {/* Download Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadVersion(ver.versionNumber)}
+                      disabled={downloadingVersion === ver.versionNumber}
+                      className="p-2 hover:bg-gray-200 text-gray-600 hover:text-gray-900 rounded-full border border-gray-200 bg-white transition-colors cursor-pointer"
+                      title={`Download version ${ver.versionNumber}`}
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+
+                    {!isCurrent && (
+                      <div>
+                        {rollbackConfirm === ver.versionNumber ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleRollback(ver.versionNumber)}
+                              disabled={rollingBackVersion === ver.versionNumber}
+                              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-full text-xs font-bold transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                            >
+                              {rollingBackVersion === ver.versionNumber ? 'Restoring...' : 'Confirm'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRollbackConfirm(null)}
+                              className="px-2 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-semibold cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            onClick={() => handleRollback(ver.versionNumber)}
-                            disabled={rollingBackVersion === ver.versionNumber}
-                            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-full text-xs font-bold transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                            type="button"
+                            onClick={() => setRollbackConfirm(ver.versionNumber)}
+                            className="px-3 py-1.5 bg-white hover:bg-amber-50 text-gray-700 hover:text-amber-800 border border-gray-200 hover:border-amber-300 rounded-full text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                            title="Rollback to this version"
                           >
-                            {rollingBackVersion === ver.versionNumber ? 'Restoring...' : 'Confirm'}
+                            <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Rollback</span>
                           </button>
-                          <button
-                            onClick={() => setRollbackConfirm(null)}
-                            className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-semibold cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setRollbackConfirm(ver.versionNumber)}
-                          className="px-3.5 py-1.5 bg-white hover:bg-amber-50 text-gray-700 hover:text-amber-800 border border-gray-200 hover:border-amber-300 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Rollback</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
